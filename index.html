@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Packfertig</title>
+  <meta name="description" content="Packlisten für Urlaub, Sport und jeden Anlass – abhaken, speichern, wiederverwenden.">
+  <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141a19" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Packfertig">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" class="app"></main>
+
+  <div id="saved" class="saved" aria-live="polite">✓ Gespeichert</div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="sheet" class="sheet" hidden></div>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+
+  <script src="app.js"></script>
+</body>
+</html>
