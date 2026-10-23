@@ -245,7 +245,7 @@ function save() {
 const getList = (id) => state.lists.find((l) => l.id === id);
 /* got = wie viele Stück schon eingepackt sind; packed = alles da */
 /* worn = so viele Stück trägst du am Reisetag; wornCounts = zählen sie als eingepackt? */
-const wornCounted = (i) => (i.wornCounts ? Math.min(i.worn || 0, i.qty) : 0);
+function wornCounted(i) { return i.wornCounts ? Math.min(i.worn || 0, i.qty) : 0; }
 function syncItem(i) {
   i.qty = Math.max(1, Number(i.qty) || 1);
   i.worn = Math.max(0, Math.round(Number(i.worn) || 0));
@@ -262,7 +262,7 @@ function syncAll() {
   }
 }
 // Unterwäsche, Socken & Shirts zieht man zusätzlich an – alles andere zählt standardmäßig mit
-const defaultWornCounts = (i) => !(i.calc === 'daily' || /unterhose|unterwäsche|socke|t-shirt|oberteil/i.test(i.name));
+function defaultWornCounts(i) { return !(i.calc === 'daily' || /unterhose|unterwäsche|socke|t-shirt|oberteil/i.test(i.name)); }
 const setGot = (i, n) => { i.got = n; syncItem(i); };
 const touch = (list) => { list.updated = Date.now(); };
 function findItem(list, id) {
@@ -1029,6 +1029,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('#sheet').hidden) { closeSheet(); sdraft = null; }
 });
 
+window.addEventListener('error', (e) => {
+  const app = $('#app');
+  if (app && !app.children.length) {
+    app.innerHTML = `<div class="empty" style="margin-top:40px"><div class="big">🧳</div><p><b>Da ist etwas schiefgelaufen.</b><br>Bitte Seite neu laden. Deine Listen sind weiterhin gespeichert.</p>
+      <p><button class="link-btn" onclick="location.reload()">Neu laden</button></p></div>`;
+  }
+});
 window.addEventListener('hashchange', route);
 window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { state = load(); route(); } });
 route();
