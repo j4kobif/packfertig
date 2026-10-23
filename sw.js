@@ -1,6 +1,6 @@
 /* Packfertig – Service Worker: macht die Seite offline nutzbar (z. B. im Flugmodus).
    Bei jeder Änderung an den Dateien die Versionsnummer erhöhen. */
-const VERSION = 'packfertig-v5';
+const VERSION = 'packfertig-v6';
 const CORE = [
   './',
   'index.html',
