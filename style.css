@@ -204,6 +204,30 @@ h1, h2, h3 { font-family: var(--font-head); margin: 0; letter-spacing: -.01em; }
   font-weight: 500;
 }
 
+/* ---------- Install-Hinweis ---------- */
+.install-hint {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 48px 14px 16px;
+  margin-bottom: 22px;
+  font-size: 14.5px;
+}
+.install-hint b:first-of-type { font-family: var(--font-head); font-size: 16px; }
+.install-hint p { margin: 6px 0 0; color: var(--muted); }
+.install-hint p b { color: var(--ink); font-family: var(--font-body); font-size: inherit; }
+.install-hint .hint-warn { color: var(--ink); background: var(--accent-soft); border-radius: 10px; padding: 8px 10px; margin-top: 10px; }
+.hint-close {
+  position: absolute; top: 8px; right: 8px;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--muted);
+  border-radius: 10px;
+}
+.hint-close svg { width: 18px; height: 18px; }
+
 /* ---------- Floating button ---------- */
 .fab {
   position: fixed;

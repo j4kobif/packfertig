@@ -10,6 +10,7 @@ Packlisten für Urlaub, Sport und jeden anderen Anlass – direkt im Browser, au
 - **Teilweise abhaken:** Bei Sachen mit Menge auf das Mengen-Feld tippen, z. B. 5 von 7 Socken eingepackt → „5/7“. Erst wenn alles drin ist, wandert es nach „Eingepackt“.
 - **Abhaken:** Eingepacktes verschwindet nicht, sondern landet in jeder Kategorie unter „✓ Eingepackt“. Antippen packt es wieder aus.
 - **Speichern:** Alles wird automatisch im Browser gespeichert. Über „Backup herunterladen / laden“ kannst du deine Listen auf ein anderes Gerät mitnehmen.
+- **Offline & Home-Bildschirm:** Einmal öffnen, dann klappt's auch im Flugmodus. In Safari über Teilen → „Zum Home-Bildschirm“ wie eine App nutzen.
 - Listen duplizieren, umbenennen, alles auspacken, löschen (mit Rückgängig).
 - Schnell hinzufügen mit Menge: `3x Badetuch` oder `Badetuch x3`.
 

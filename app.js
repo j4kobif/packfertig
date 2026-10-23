@@ -274,7 +274,7 @@ function listMeta(list) {
     const s = list.settings;
     return `${s.days} ${s.days === 1 ? 'Tag' : 'Tage'} · ${WEATHER[s.weather]?.label || ''}${s.reserve ? ` · +${s.reserveCount} Reserve` : ''}`;
   }
-  if (list.type === 'sport') return `${SPORTS[list.settings.sport]?.label} · ${ANLASS[list.settings.anlass]?.label}`;
+  if (list.type === 'sport') return `Sporttasche · ${ANLASS[list.settings.anlass]?.label}`;
   return 'Eigene Liste';
 }
 
@@ -324,6 +324,7 @@ function renderHome() {
       <h2>Nichts mehr vergessen.</h2>
       <p>Liste anlegen, Sachen abhaken – alles Eingepackte landet ordentlich unter „Eingepackt“.</p>
     </section>
+    ${installHint()}
     <p class="section-label">Deine Listen</p>
     ${lists.length ? `<ul class="lists">${cards}</ul>` : `
       <div class="empty">
@@ -336,6 +337,25 @@ function renderHome() {
       <button class="link-btn" data-action="import">Backup laden</button>
     </div>
     <button class="fab" data-action="new">${I.plus} Neue Liste</button>`;
+}
+
+/* ---------- Home-Bildschirm & Offline ---------- */
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function hintHidden() { try { return localStorage.getItem('packfertig.hint') === 'aus'; } catch (e) { return false; } }
+function installHint() {
+  if (isStandalone() || hintHidden()) return '';
+  const how = isIOS()
+    ? 'In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>.'
+    : 'Im Browser-Menü <b>„App installieren“</b> bzw. <b>„Zum Startbildschirm hinzufügen“</b> wählen.';
+  const warn = isIOS() && state.lists.length
+    ? '<p class="hint-warn">Wichtig: Die App auf dem Home-Bildschirm hat einen eigenen Speicher. Lade vorher hier ein <b>Backup</b> herunter und in der App wieder hoch – sonst fehlen dort deine bisherigen Listen.</p>'
+    : '';
+  return `<section class="install-hint">
+    <button class="hint-close" data-action="hide-hint" aria-label="Hinweis ausblenden">${I.close}</button>
+    <b>📲 Als App aufs Handy</b>
+    <p>${how} Danach funktioniert Packfertig auch im Flugmodus.</p>${warn}
+  </section>`;
 }
 
 function renderItem(item, packed) {
@@ -674,6 +694,7 @@ const actions = {
     cat.collapsed = !cat.collapsed;
     save(); render();
   },
+  'hide-hint'() { try { localStorage.setItem('packfertig.hint', 'aus'); } catch (e) { /* egal */ } render(); },
   'edit-toggle'() { view.edit = !view.edit; render(); },
   qty(el) {
     const list = getList(view.listId);
@@ -864,3 +885,9 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('hashchange', route);
 window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { state = load(); route(); } });
 route();
+
+/* Offline-Modus & dauerhafter Speicher */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
