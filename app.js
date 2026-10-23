@@ -210,7 +210,7 @@ function buildCategories(tpl, match, o, settings) {
       if (!match(cond, o) || seen.has(iname)) continue;
       seen.add(iname);
       const calc = typeof rule === 'string' ? rule : null;
-      list.push({ id: uid(), name: iname, qty: calc && settings ? calcQty(calc, settings) : rule, calc, packed: false });
+      list.push({ id: uid(), name: iname, qty: calc && settings ? calcQty(calc, settings) : rule, calc, packed: false, got: 0 });
     }
     return { id: uid(), name, items: list, collapsed: false };
   }).filter((c) => c.items.length);
@@ -228,8 +228,10 @@ function load() {
   } catch (e) { /* ignorieren */ }
   return { lists: [] };
 }
+syncAll();
 let savedTimer;
 function save() {
+  syncAll();
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
     const el = $('#saved');
@@ -241,6 +243,15 @@ function save() {
   }
 }
 const getList = (id) => state.lists.find((l) => l.id === id);
+/* got = wie viele Stück schon eingepackt sind; packed = alles da */
+function syncItem(i) {
+  i.qty = Math.max(1, Number(i.qty) || 1);
+  if (typeof i.got !== 'number') i.got = i.packed ? i.qty : 0;
+  i.got = Math.min(i.qty, Math.max(0, Math.round(i.got)));
+  i.packed = i.got >= i.qty;
+}
+function syncAll() { for (const l of state.lists) for (const c of l.categories || []) for (const i of c.items || []) syncItem(i); }
+const setGot = (i, n) => { i.got = n; syncItem(i); };
 const touch = (list) => { list.updated = Date.now(); };
 function findItem(list, id) {
   for (const cat of list.categories) {
@@ -250,9 +261,13 @@ function findItem(list, id) {
   return null;
 }
 function counts(list) {
-  let total = 0, packed = 0;
-  for (const c of list.categories) for (const i of c.items) { total++; if (i.packed) packed++; }
-  return { total, packed, pct: total ? Math.round((packed / total) * 100) : 0 };
+  let total = 0, packed = 0, partial = 0, frac = 0;
+  for (const c of list.categories) for (const i of c.items) {
+    total++;
+    if (i.packed) packed++; else if (i.got > 0) partial++;
+    frac += i.got / i.qty;
+  }
+  return { total, packed, partial, pct: total ? Math.floor((frac / total) * 100) : 0 };
 }
 function listMeta(list) {
   if (list.type === 'urlaub') {
@@ -324,7 +339,7 @@ function renderHome() {
 }
 
 function renderItem(item, packed) {
-  const qty = item.qty > 1 ? `<span class="qty">${item.qty}×</span>` : '';
+  const partial = item.qty > 1 && item.got > 0 && !packed;
   const editTools = view.edit ? `
     <div class="stepper">
       <button data-action="qty" data-id="${item.id}" data-delta="-1" aria-label="Weniger">−</button>
@@ -335,10 +350,11 @@ function renderItem(item, packed) {
   return `<li class="item" data-item="${item.id}">
     <button class="item-main" data-action="${view.edit ? 'rename-item' : packed ? 'unpack' : 'pack'}" data-id="${item.id}"
       aria-label="${esc(item.name)} ${view.edit ? 'umbenennen' : packed ? 'wieder auspacken' : 'als eingepackt markieren'}">
-      <span class="check">${I.check}</span>
+      <span class="check ${partial ? 'part' : ''}" style="--p:${Math.round((item.got / item.qty) * 100)}%">${I.check}</span>
       <span class="item-name">${esc(item.name)}</span>
-      ${view.edit ? '' : qty}
     </button>
+    ${!view.edit && item.qty > 1 ? `<button class="qty ${partial ? 'part' : ''}" data-action="count" data-id="${item.id}"
+      aria-label="${esc(item.name)}: ${item.got} von ${item.qty} eingepackt – Anzahl ändern">${packed || partial ? `${item.got}/${item.qty}` : `${item.qty}×`}</button>` : ''}
     ${editTools}
   </li>`;
 }
@@ -392,7 +408,7 @@ function renderList(list) {
     </header>
     <section class="summary">
       ${chips.length ? `<div class="chips">${chips.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : ''}
-      <div class="progress-row"><strong>${c.packed} von ${c.total}</strong><span>eingepackt · ${c.pct} %</span></div>
+      <div class="progress-row"><strong>${c.packed} von ${c.total}</strong><span>eingepackt${c.partial ? ` · ${c.partial} teilweise` : ''} · ${c.pct} %</span></div>
       <span class="bar ${done ? 'full' : ''}"><i style="width:${c.pct}%"></i></span>
     </section>
     <div class="toolbar">
@@ -545,6 +561,26 @@ function renderSettings() {
     <button class="primary" data-action="settings-save">Übernehmen</button>`;
 }
 
+/* ---------- Teilweise eingepackt ---------- */
+let cdraft = null;
+function renderCount() {
+  const it = findItem(getList(view.listId), cdraft.id).item;
+  return sheetHead(it.name) + `
+    <div class="field"><span class="label">Wie viele hast du schon eingepackt?</span>
+      <div class="big-stepper">
+        <button type="button" data-action="count-step" data-delta="-1" aria-label="Eins weniger">−</button>
+        <output>${cdraft.got} <small>von ${it.qty}</small></output>
+        <button type="button" data-action="count-step" data-delta="1" aria-label="Eins mehr">+</button>
+      </div>
+      <p class="hint">Z. B. wenn ein Teil noch in der Wäsche ist – der Rest bleibt offen, bis alles drin ist.</p>
+    </div>
+    <div class="count-quick">
+      <button class="opt" data-action="count-set" data-val="0">Keins</button>
+      <button class="opt" data-action="count-set" data-val="${it.qty}">Alle ${it.qty}</button>
+    </div>
+    <button class="primary" data-action="count-save">Übernehmen</button>`;
+}
+
 /* ---------- Menü ---------- */
 function renderMenu(list) {
   return sheetHead(list.name) + `<div class="menu-list">
@@ -577,7 +613,7 @@ function setPacked(id, packed, el) {
   const f = findItem(list, id);
   if (!f) return;
   const apply = () => {
-    f.item.packed = packed;
+    setGot(f.item, packed ? f.item.qty : 0);
     if (packed) f.cat.collapsed = false;
     view.lastMoved = id;
     touch(list); save(); render();
@@ -610,6 +646,27 @@ const actions = {
   'close-sheet'() { closeSheet(); sdraft = null; },
 
   pack(el) { setPacked(el.dataset.id, true, el); },
+  count(el) {
+    const f = findItem(getList(view.listId), el.dataset.id);
+    cdraft = { id: f.item.id, got: f.item.got };
+    openSheet(renderCount());
+  },
+  'count-step'(el) {
+    const it = findItem(getList(view.listId), cdraft.id).item;
+    cdraft.got = clamp(cdraft.got + Number(el.dataset.delta), 0, it.qty);
+    updateSheet(renderCount());
+  },
+  'count-set'(el) { cdraft.got = Number(el.dataset.val); updateSheet(renderCount()); },
+  'count-save'() {
+    const list = getList(view.listId);
+    const f = findItem(list, cdraft.id);
+    const wasPacked = f.item.packed;
+    setGot(f.item, cdraft.got);
+    if (f.item.packed !== wasPacked) view.lastMoved = f.item.id;
+    if (f.item.packed) f.cat.collapsed = false;
+    cdraft = null;
+    touch(list); save(); closeSheet(); render();
+  },
   unpack(el) { setPacked(el.dataset.id, false, el); },
   'toggle-packed'(el) {
     const list = getList(view.listId);
@@ -681,11 +738,11 @@ const actions = {
   },
   'reset-all'() {
     const list = getList(view.listId);
-    const before = list.categories.map((c) => c.items.map((i) => i.packed));
-    list.categories.forEach((c) => c.items.forEach((i) => { i.packed = false; }));
+    const before = list.categories.map((c) => c.items.map((i) => i.got));
+    list.categories.forEach((c) => c.items.forEach((i) => setGot(i, 0)));
     touch(list); save(); closeSheet(); render();
     toast('Alles wieder ausgepackt', () => {
-      list.categories.forEach((c, ci) => c.items.forEach((i, ii) => { i.packed = before[ci]?.[ii] ?? i.packed; }));
+      list.categories.forEach((c, ci) => c.items.forEach((i, ii) => setGot(i, before[ci]?.[ii] ?? i.got)));
       save(); render();
     });
   },
@@ -701,7 +758,7 @@ const actions = {
     copy.id = uid();
     copy.name = `${src.name} (Kopie)`.slice(0, 60);
     copy.created = copy.updated = Date.now();
-    copy.categories.forEach((c) => { c.id = uid(); c.items.forEach((i) => { i.id = uid(); i.packed = false; }); });
+    copy.categories.forEach((c) => { c.id = uid(); c.items.forEach((i) => { i.id = uid(); setGot(i, 0); }); });
     state.lists.push(copy);
     save(); closeSheet();
     location.hash = `#/liste/${copy.id}`;
@@ -766,7 +823,7 @@ document.addEventListener('submit', (e) => {
   if (m) {
     if (/^\d/.test(m[1])) { qty = Number(m[1]); label = m[2]; } else { label = m[1]; qty = Number(m[2]); }
   }
-  cat.items.push({ id: uid(), name: label.slice(0, 80), qty: clamp(qty || 1, 1, 99), calc: null, packed: false });
+  cat.items.push({ id: uid(), name: label.slice(0, 80), qty: clamp(qty || 1, 1, 99), calc: null, packed: false, got: 0 });
   touch(list); save(); render();
   const again = $(`[data-add="${cat.id}"]`);
   if (again) again.focus();
@@ -790,7 +847,7 @@ $('#importFile').addEventListener('change', async (e) => {
       if (l.type === 'urlaub' && !(l.settings.days && WEATHER[l.settings.weather] && Array.isArray(l.settings.extras))) l.type = 'eigene';
       if (l.type === 'sport' && !(SPORTS[l.settings.sport] && ANLASS[l.settings.anlass])) l.type = 'eigene';
       l.emoji = l.emoji || TYPES[l.type].emoji;
-      l.categories.forEach((c) => { c.id = c.id || uid(); c.items = Array.isArray(c.items) ? c.items : []; c.items.forEach((i) => { i.id = i.id || uid(); i.qty = Number(i.qty) || 1; }); });
+      l.categories.forEach((c) => { c.id = c.id || uid(); c.items = Array.isArray(c.items) ? c.items : []; c.items.forEach((i) => { i.id = i.id || uid(); i.qty = Number(i.qty) || 1; syncItem(i); }); });
       state.lists.push(l);
     });
     save(); render();

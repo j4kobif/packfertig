@@ -343,10 +343,20 @@ h1, h2, h3 { font-family: var(--font-head); margin: 0; letter-spacing: -.01em; }
   font-size: 14px;
   background: var(--accent-soft);
   color: var(--accent);
-  padding: 3px 9px;
+  border: 1px solid transparent;
+  min-width: 48px;
+  min-height: 34px;
+  padding: 4px 10px;
   border-radius: 99px;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
+.qty.part { background: var(--surface); border-color: var(--accent); }
+.check.part {
+  border-color: var(--teal);
+  background: conic-gradient(var(--teal) var(--p), transparent 0);
+}
+.count-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .item.leaving { opacity: 0; transform: translateX(24px); }
 .item.arrived { animation: arrive .5s ease; }
 @keyframes arrive {
