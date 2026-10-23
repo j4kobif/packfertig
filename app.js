@@ -244,13 +244,25 @@ function save() {
 }
 const getList = (id) => state.lists.find((l) => l.id === id);
 /* got = wie viele Stück schon eingepackt sind; packed = alles da */
+/* worn = so viele Stück trägst du am Reisetag; wornCounts = zählen sie als eingepackt? */
+const wornCounted = (i) => (i.wornCounts ? Math.min(i.worn || 0, i.qty) : 0);
 function syncItem(i) {
   i.qty = Math.max(1, Number(i.qty) || 1);
+  i.worn = Math.max(0, Math.round(Number(i.worn) || 0));
+  i.wornCounts = !!i.wornCounts;
   if (typeof i.got !== 'number') i.got = i.packed ? i.qty : 0;
-  i.got = Math.min(i.qty, Math.max(0, Math.round(i.got)));
-  i.packed = i.got >= i.qty;
+  i.got = Math.min(i.qty - wornCounted(i), Math.max(0, Math.round(i.got)));
+  i.have = i.got + wornCounted(i);
+  i.packed = i.have >= i.qty;
 }
-function syncAll() { for (const l of state.lists) for (const c of l.categories || []) for (const i of c.items || []) syncItem(i); }
+function syncAll() {
+  for (const l of state.lists) {
+    if (!Array.isArray(l.outfitExtra)) l.outfitExtra = [];
+    for (const c of l.categories || []) for (const i of c.items || []) syncItem(i);
+  }
+}
+// Unterwäsche, Socken & Shirts zieht man zusätzlich an – alles andere zählt standardmäßig mit
+const defaultWornCounts = (i) => !(i.calc === 'daily' || /unterhose|unterwäsche|socke|t-shirt|oberteil/i.test(i.name));
 const setGot = (i, n) => { i.got = n; syncItem(i); };
 const touch = (list) => { list.updated = Date.now(); };
 function findItem(list, id) {
@@ -265,7 +277,7 @@ function counts(list) {
   for (const c of list.categories) for (const i of c.items) {
     total++;
     if (i.packed) packed++; else if (i.got > 0) partial++;
-    frac += i.got / i.qty;
+    frac += i.have / i.qty;
   }
   return { total, packed, partial, pct: total ? Math.floor((frac / total) * 100) : 0 };
 }
@@ -359,7 +371,9 @@ function installHint() {
 }
 
 function renderItem(item, packed) {
-  const partial = item.qty > 1 && item.got > 0 && !packed;
+  const partial = item.qty > 1 && item.have > 0 && !packed;
+  const worn = item.worn > 0
+    ? `<span class="worn" title="${item.wornCounts ? 'Angezogen – zählt als eingepackt' : 'Angezogen – zusätzlich'}">👕 ${item.wornCounts ? '' : '+'}${item.worn} an</span>` : '';
   const editTools = view.edit ? `
     <div class="stepper">
       <button data-action="qty" data-id="${item.id}" data-delta="-1" aria-label="Weniger">−</button>
@@ -370,13 +384,32 @@ function renderItem(item, packed) {
   return `<li class="item" data-item="${item.id}">
     <button class="item-main" data-action="${view.edit ? 'rename-item' : packed ? 'unpack' : 'pack'}" data-id="${item.id}"
       aria-label="${esc(item.name)} ${view.edit ? 'umbenennen' : packed ? 'wieder auspacken' : 'als eingepackt markieren'}">
-      <span class="check ${partial ? 'part' : ''}" style="--p:${Math.round((item.got / item.qty) * 100)}%">${I.check}</span>
-      <span class="item-name">${esc(item.name)}</span>
+      <span class="check ${partial ? 'part' : ''}" style="--p:${Math.round((item.have / item.qty) * 100)}%">${I.check}</span>
+      <span class="item-name">${esc(item.name)}${worn}</span>
     </button>
     ${!view.edit && item.qty > 1 ? `<button class="qty ${partial ? 'part' : ''}" data-action="count" data-id="${item.id}"
-      aria-label="${esc(item.name)}: ${item.got} von ${item.qty} eingepackt – Anzahl ändern">${packed || partial ? `${item.got}/${item.qty}` : `${item.qty}×`}</button>` : ''}
+      aria-label="${esc(item.name)}: ${item.have} von ${item.qty} eingepackt – Anzahl ändern">${packed || partial ? `${item.have}/${item.qty}` : `${item.qty}×`}</button>` : ''}
     ${editTools}
   </li>`;
+}
+
+function renderOutfitCard(list) {
+  const worn = [];
+  for (const c of list.categories) for (const i of c.items) if (i.worn > 0) worn.push(i);
+  const extras = list.outfitExtra || [];
+  if (list.type !== 'urlaub' && !worn.length && !extras.length) return '';
+  const rows = [
+    ...worn.map((i) => `<li><span>${i.worn}× ${esc(i.name)}</span><small class="${i.wornCounts ? 'counts' : ''}">${i.wornCounts ? '✓ zählt als eingepackt' : 'zusätzlich'}</small></li>`),
+    ...extras.map((x) => `<li><span>${esc(x.name)}</span><small>nur angezogen</small></li>`),
+  ].join('');
+  return `<section class="outfit">
+    <div class="outfit-head">
+      <b>👕 Reiseoutfit</b>
+      <button class="pill" data-action="outfit">${rows ? 'Ändern' : 'Auswählen'}</button>
+    </div>
+    ${rows ? `<ul class="outfit-list">${rows}</ul>`
+      : '<p class="hint">Was ziehst du am Reisetag an? Angezogene Teile kannst du als eingepackt zählen lassen – z. B. den zweiten Pulli.</p>'}
+  </section>`;
 }
 
 function renderList(list) {
@@ -431,6 +464,7 @@ function renderList(list) {
       <div class="progress-row"><strong>${c.packed} von ${c.total}</strong><span>eingepackt${c.partial ? ` · ${c.partial} teilweise` : ''} · ${c.pct} %</span></div>
       <span class="bar ${done ? 'full' : ''}"><i style="width:${c.pct}%"></i></span>
     </section>
+    ${renderOutfitCard(list)}
     <div class="toolbar">
       <button class="pill ${view.edit ? 'on' : ''}" data-action="edit-toggle" aria-pressed="${view.edit}">${I.edit} ${view.edit ? 'Fertig' : 'Bearbeiten'}</button>
       ${list.type === 'urlaub' ? `<button class="pill" data-action="settings">${I.sliders} Tage & Reserve</button>` : ''}
@@ -585,26 +619,91 @@ function renderSettings() {
 let cdraft = null;
 function renderCount() {
   const it = findItem(getList(view.listId), cdraft.id).item;
+  const cw = wornCounted(it);
+  const max = it.qty - cw;
+  const wornNote = it.worn > 0
+    ? (it.wornCounts
+      ? `<div class="preview">👕 ${cw} ziehst du an – zählt mit. Zusammen: <b>${cdraft.got + cw} von ${it.qty}</b>.</div>`
+      : `<div class="preview">👕 ${it.worn} ziehst du zusätzlich an – zählt nicht mit.</div>`)
+    : '';
   return sheetHead(it.name) + `
-    <div class="field"><span class="label">Wie viele hast du schon eingepackt?</span>
+    <div class="field"><span class="label">Wie viele sind schon im Koffer?</span>
       <div class="big-stepper">
         <button type="button" data-action="count-step" data-delta="-1" aria-label="Eins weniger">−</button>
-        <output>${cdraft.got} <small>von ${it.qty}</small></output>
+        <output>${cdraft.got} <small>von ${max}</small></output>
         <button type="button" data-action="count-step" data-delta="1" aria-label="Eins mehr">+</button>
       </div>
       <p class="hint">Z. B. wenn ein Teil noch in der Wäsche ist – der Rest bleibt offen, bis alles drin ist.</p>
+      ${wornNote}
     </div>
     <div class="count-quick">
       <button class="opt" data-action="count-set" data-val="0">Keins</button>
-      <button class="opt" data-action="count-set" data-val="${it.qty}">Alle ${it.qty}</button>
+      <button class="opt" data-action="count-set" data-val="${max}">Alle ${max}</button>
     </div>
     <button class="primary" data-action="count-save">Übernehmen</button>`;
+}
+
+/* ---------- Reiseoutfit ---------- */
+let odraft = null;
+function openOutfit() {
+  const list = getList(view.listId);
+  const items = {};
+  for (const c of list.categories) for (const i of c.items) {
+    items[i.id] = { worn: i.worn, counts: i.worn > 0 ? i.wornCounts : defaultWornCounts(i) };
+  }
+  odraft = { items, extras: (list.outfitExtra || []).map((x) => ({ ...x })), showAll: false };
+  openSheet(renderOutfit());
+}
+function outfitRow(i) {
+  const d = odraft.items[i.id];
+  const max = d.counts ? i.qty : 5;
+  return `<li class="o-row ${d.worn ? 'on' : ''}">
+    <div class="o-top">
+      <span class="o-name">${esc(i.name)}${i.qty > 1 ? ` <small>· ${i.qty} geplant</small>` : ''}</span>
+      <div class="stepper">
+        <button data-action="o-step" data-id="${i.id}" data-delta="-1" aria-label="Weniger anziehen" ${d.worn <= 0 ? 'disabled' : ''}>−</button>
+        <span>${d.worn}</span>
+        <button data-action="o-step" data-id="${i.id}" data-delta="1" aria-label="Mehr anziehen" ${d.worn >= max ? 'disabled' : ''}>+</button>
+      </div>
+    </div>
+    ${d.worn ? `<div class="segmented o-mode">
+      <button class="opt ${d.counts ? 'sel' : ''}" data-action="o-mode" data-id="${i.id}" data-val="1">Zählt als eingepackt</button>
+      <button class="opt ${!d.counts ? 'sel' : ''}" data-action="o-mode" data-id="${i.id}" data-val="0">Zusätzlich</button>
+    </div>
+    <p class="o-explain">${d.counts
+      ? `Von ${i.qty} geplanten trägst du ${Math.min(d.worn, i.qty)} – ${i.qty - Math.min(d.worn, i.qty)} kommen in den Koffer.`
+      : `Die ${i.qty} bleiben komplett für den Koffer, angezogen kommt dazu.`}</p>` : ''}
+  </li>`;
+}
+function renderOutfit() {
+  const list = getList(view.listId);
+  const isCloth = (c) => /kleid/i.test(c.name);
+  const cloth = list.categories.filter(isCloth);
+  const other = list.categories.filter((c) => !isCloth(c));
+  const main = cloth.length ? cloth : list.categories;
+  const group = (c) => c.items.length ? `<p class="section-label o-cat">${esc(c.name)}</p><ul class="o-list">${c.items.map(outfitRow).join('')}</ul>` : '';
+  const othersHaveWorn = other.some((c) => c.items.some((i) => odraft.items[i.id].worn > 0));
+  const showOther = cloth.length && other.length && (odraft.showAll || othersHaveWorn);
+  return sheetHead('Reiseoutfit') + `
+    <p class="hint" style="margin:-6px 0 14px">Was ziehst du am Reisetag an? Wähle bei jedem Teil, ob es als eingepackt zählt (z. B. der zweite Pulli) oder zusätzlich ist (z. B. Socken & Unterhose).</p>
+    ${main.map(group).join('')}
+    ${showOther ? other.map(group).join('') : (cloth.length && other.length ? '<button class="link-btn o-more" data-action="o-all">Weitere Sachen anzeigen</button>' : '')}
+    <p class="section-label o-cat">Nur angezogen</p>
+    <p class="hint" style="margin:-4px 0 8px">Sachen, die nicht auf der Packliste stehen – z. B. die Jeans für die Fahrt.</p>
+    ${odraft.extras.length ? `<ul class="o-list">${odraft.extras.map((x) => `<li class="o-row on"><div class="o-top"><span class="o-name">${esc(x.name)}</span>
+      <button class="mini-btn danger" data-action="o-del-extra" data-id="${x.id}" aria-label="Entfernen">${I.trash}</button></div></li>`).join('')}</ul>` : ''}
+    <form class="add-row o-add" data-outfit-add>
+      <input type="text" placeholder="+ z. B. Jeans, Sneaker …" aria-label="Kleidungsstück fürs Outfit hinzufügen" autocomplete="off" enterkeyhint="done">
+      <button type="submit" aria-label="Hinzufügen">＋</button>
+    </form>
+    <button class="primary" data-action="outfit-save">Outfit übernehmen</button>`;
 }
 
 /* ---------- Menü ---------- */
 function renderMenu(list) {
   return sheetHead(list.name) + `<div class="menu-list">
     ${list.type === 'urlaub' ? `<button class="menu-item" data-action="settings">${I.sliders} Tage & Reserve ändern</button>` : ''}
+    <button class="menu-item" data-action="outfit">👕 Reiseoutfit wählen</button>
     <button class="menu-item" data-action="reset-all">${I.reset} Alles wieder auspacken</button>
     <button class="menu-item" data-action="rename-list">${I.edit} Umbenennen</button>
     <button class="menu-item" data-action="dup-list">${I.copy} Liste duplizieren</button>
@@ -663,7 +762,7 @@ const actions = {
     updateSheet(target === sdraft ? renderSettings() : renderCreate());
   },
   'create-submit'() { createList(); },
-  'close-sheet'() { closeSheet(); sdraft = null; },
+  'close-sheet'() { closeSheet(); sdraft = null; odraft = null; },
 
   pack(el) { setPacked(el.dataset.id, true, el); },
   count(el) {
@@ -673,7 +772,7 @@ const actions = {
   },
   'count-step'(el) {
     const it = findItem(getList(view.listId), cdraft.id).item;
-    cdraft.got = clamp(cdraft.got + Number(el.dataset.delta), 0, it.qty);
+    cdraft.got = clamp(cdraft.got + Number(el.dataset.delta), 0, it.qty - wornCounted(it));
     updateSheet(renderCount());
   },
   'count-set'(el) { cdraft.got = Number(el.dataset.val); updateSheet(renderCount()); },
@@ -687,7 +786,43 @@ const actions = {
     cdraft = null;
     touch(list); save(); closeSheet(); render();
   },
-  unpack(el) { setPacked(el.dataset.id, false, el); },
+  unpack(el) {
+    const f = findItem(getList(view.listId), el.dataset.id);
+    if (f && wornCounted(f.item) >= f.item.qty) { toast('Ziehst du an – im Reiseoutfit änderbar'); return; }
+    setPacked(el.dataset.id, false, el);
+  },
+  outfit() { openOutfit(); },
+  'o-step'(el) {
+    const it = findItem(getList(view.listId), el.dataset.id).item;
+    const d = odraft.items[it.id];
+    d.worn = clamp(d.worn + Number(el.dataset.delta), 0, d.counts ? it.qty : 5);
+    updateSheet(renderOutfit());
+  },
+  'o-mode'(el) {
+    const it = findItem(getList(view.listId), el.dataset.id).item;
+    const d = odraft.items[it.id];
+    d.counts = el.dataset.val === '1';
+    if (d.counts) d.worn = Math.min(d.worn, it.qty);
+    updateSheet(renderOutfit());
+  },
+  'o-all'() { odraft.showAll = true; updateSheet(renderOutfit()); },
+  'o-del-extra'(el) { odraft.extras = odraft.extras.filter((x) => x.id !== el.dataset.id); updateSheet(renderOutfit()); },
+  'outfit-save'() {
+    const list = getList(view.listId);
+    for (const c of list.categories) for (const i of c.items) {
+      const d = odraft.items[i.id];
+      if (!d) continue;
+      const wasPacked = i.packed;
+      i.worn = d.worn;
+      i.wornCounts = d.counts;
+      syncItem(i);
+      if (i.packed && !wasPacked) c.collapsed = false;
+    }
+    list.outfitExtra = odraft.extras;
+    odraft = null;
+    touch(list); save(); closeSheet(); render();
+    toast('Reiseoutfit gespeichert');
+  },
   'toggle-packed'(el) {
     const list = getList(view.listId);
     const cat = list.categories.find((c) => c.id === el.dataset.cat);
@@ -831,6 +966,18 @@ document.addEventListener('change', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
+  const of = e.target.closest('[data-outfit-add]');
+  if (of) {
+    e.preventDefault();
+    const name = of.querySelector('input').value.trim();
+    if (name && odraft) {
+      odraft.extras.push({ id: uid(), name: name.slice(0, 60) });
+      updateSheet(renderOutfit());
+      const inp = $('#sheet [data-outfit-add] input');
+      if (inp) inp.focus();
+    }
+    return;
+  }
   const form = e.target.closest('[data-add-form]');
   if (!form) return;
   e.preventDefault();

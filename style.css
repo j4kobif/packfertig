@@ -458,6 +458,55 @@ h1, h2, h3 { font-family: var(--font-head); margin: 0; letter-spacing: -.01em; }
   color: var(--muted);
 }
 
+/* ---------- Reiseoutfit ---------- */
+.outfit {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.outfit-head { display: flex; align-items: center; gap: 10px; }
+.outfit-head b { flex: 1; font-family: var(--font-head); font-size: 17px; }
+.outfit-head .pill { padding: 7px 14px; }
+.outfit .hint { margin: 6px 0 0; }
+.outfit-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.outfit-list li { display: flex; align-items: baseline; gap: 8px; font-size: 15px; }
+.outfit-list li span { flex: 1; min-width: 0; }
+.outfit-list small { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.outfit-list small.counts { color: var(--packed-ink); font-weight: 700; }
+.worn {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--packed-ink);
+  background: var(--packed-bg);
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.o-cat { margin: 18px 4px 8px; }
+.o-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.o-row {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 10px 8px 14px;
+}
+.o-row.on { border-color: var(--teal); }
+.o-top { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+.o-name { flex: 1; min-width: 0; font-weight: 500; }
+.o-name small { color: var(--muted); font-weight: 400; }
+.stepper button:disabled { opacity: .35; }
+.o-mode { margin: 8px 0 4px; }
+.o-mode .opt { font-size: 13.5px; padding: 9px 4px; }
+.o-explain { margin: 4px 2px 2px; font-size: 13px; color: var(--muted); }
+.o-more { margin-top: 12px; }
+.o-add { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin: 10px 0 14px; padding: 6px 8px 6px 14px; }
+
 /* ---------- Bottom sheet ---------- */
 .sheet { position: fixed; inset: 0; z-index: 50; }
 .sheet-backdrop {
